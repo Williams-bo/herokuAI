@@ -1,43 +1,56 @@
 
-import openai
-import telegram
+import os
 from flask import Flask, request
+import telebot
+import openai
 
+# Set up OpenAI
+openai.api_key = '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'
+
+# Set up Telegram bot
+bot_token = '5745387931:AAHMqhho8Qz6PZkRE_K-qPs6F5gmZPE-y8U'
+bot = telebot.TeleBot(bot_token)
+
+# Set up Flask
 app = Flask(__name__)
-telegram_bot_token = "5745387931:AAHMqhho8Qz6PZkRE_K-qPs6F5gmZPE-y8U"
-openai.api_key = "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"
 
-bot = telegram.Bot(token=telegram_bot_token)
+# Set up Telegram bot handlers
+@bot.message_handler(commands=['start'])
+def start(message):
+    bot.reply_to(message, 'Hello! I am your AI bot. How can I assist you?')
 
-def generate_response(message):
-    # Use OpenAI to generate a response
+@bot.message_handler(func=lambda message: True)
+def handle_message(message):
+    user_message = message.text
+
+    # Send message to OpenAI for processing
     response = openai.Completion.create(
-        model="text-davinci-003",
-        prompt=message,
-        temperature=0.6,
-        max_tokens=50,
-        n=1,
-        stop=None,
+        engine='text-davinci-003',
+        prompt=user_message,
+        max_tokens=50
     )
-    response_text = response.choices[0].text.strip()
-    return response_text
+    generated_text = response.choices[0].text.strip()
 
-@app.route('/', methods=['GET', 'POST'])
-def telegram_webhook():
-    if request.method == 'POST':
-        update = telegram.Update.de_json(request.get_json(force=True), bot)
-        chat_id = update.message.chat_id
-        message = update.message.text
-        response = generate_response(message)
-        bot.send_message(chat_id=chat_id, text=response)
-        return 'OK'
-    else:
-        return 'This is the root route of the Flask app.'
+    # Send the generated response back to the user
+    bot.reply_to(message, generated_text)
 
+# Set up webhook endpoint
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    bot.process_new_updates([telebot.types.Update.de_json(request.stream.read().decode("utf-8"))])
+    return "OK"
 
+@app.route('/')
+def index():
+    return "Hello, this is your AI bot!"
+
+# Start the Flask server
+def start():
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
 
 if __name__ == '__main__':
-    app.run()
+    start()
+
 
 
 
